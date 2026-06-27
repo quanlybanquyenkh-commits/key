@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Quản Lý Bản Quyền</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .header-group { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+        .header-group h2 { margin: 0; color: #007bff; }
+        .header-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+        .button-row { display: flex; gap: 10px; flex-wrap: wrap; }
+        .form-container, .filter-container { display: flex; flex-wrap: wrap; gap: 15px; background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #e9ecef; margin-bottom: 20px; align-items: flex-end; }
+        .filter-container { background: #eef2f7; border-color: #d1d9e6; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 160px; }
+        .form-group.btn-group { flex: 0; min-width: auto; }
+        label { font-weight: 600; font-size: 14px; color: #495057; }
+        input, select, button { padding: 10px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; outline: none; transition: all 0.2s; box-sizing: border-box; }
+        input:focus, select:focus { border-color: #80bdff; box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); }
+        button { font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; justify-content: center; }
+        .btn-add { background-color: #28a745; color: white; border: none; white-space: nowrap; }
+        .btn-add:hover { background-color: #218838; }
+        .btn-update { background-color: #007bff; color: white; border: none; white-space: nowrap; display: none; }
+        .btn-update:hover { background-color: #0069d9; }
+        .btn-cancel { background-color: #6c757d; color: white; border: none; display: none; }
+        .btn-cancel:hover { background-color: #5a6268; }
+        .btn-delete { background-color: #dc3545; color: white; border: none; padding: 5px 8px; font-size: 12px; }
+        .btn-delete:hover { background-color: #c82333; }
+        .btn-edit { background-color: #ffc107; color: #212529; border: none; padding: 5px 8px; font-size: 12px; }
+        .btn-edit:hover { background-color: #e0a800; }
+        .btn-import { background-color: #6f42c1; color: white; border: none; }
+        .btn-import:hover { background-color: #5a32a3; }
+        .btn-export { background-color: #17a2b8; color: white; border: none; }
+        .btn-export:hover { background-color: #138496; }
+        .btn-restore { background-color: #fd7e14; color: white; border: none; display: none; }
+        .btn-restore:hover { background-color: #e66b09; }
+        .table-responsive { overflow-x: auto; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; background: white; min-width: 1100px; }
+        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: left; }
+        th { background-color: #007bff; color: white; font-weight: 600; position: sticky; top: 0; }
+        tr:nth-child(even) { background-color: #f8f9fa; }
+        tr:hover { background-color: #f1f3f5; }
+        .text-center { text-align: center; }
+        .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; display: inline-block; }
+        .status-active { background-color: #d4edda; color: #155724; }
+        .status-permanent { background-color: #cce5ff; color: #004085; }
+        .status-pending { background-color: #fff3cd; color: #856404; }
+        .status-expired { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-group">
+        <h2>📑 Hệ Thống Quản Lý Bản Quyền</h2>
+        <div class="header-actions">
+            <div class="button-row">
+                <input type="file" id="fileInput" accept=".txt" style="display: none;" onchange="docFileDuLieu(this)">
+                <button type="button" class="btn-import" onclick="document.getElementById('fileInput').click()">📂 Nhập file (TXT)</button>
+                <button type="button" class="btn-restore" id="btnRestoreAuto" onclick="khoiPhucBanTuDong()">🔄 Khôi phục bản tự động</button>
+                <button type="button" class="btn-export" onclick="taiFileSaoLuuVeMay(false)">💾 Xuất file dự phòng (Thủ công)</button>
+            </div>
+            <div style="font-size: 12px; color: #495057; display: flex; align-items: center; gap: 6px; user-select: none;">
+                <input type="checkbox" id="chkAutoDownload" onchange="luuCauHinhAutoDownload()" style="cursor: pointer; margin: 0;">
+                <label for="chkAutoDownload" style="font-weight: normal; color: #6c757d; cursor: pointer; font-size: 12px; margin: 0;">Tự động tải file TXT về máy khi dữ liệu thay đổi</label>
+                <span id="txtLastAutoSave" style="margin-left: 8px; font-style: italic; color: #28a745; font-weight: bold;"></span>
+            </div>
+        </div>
+    </div>
+    
+    <fieldset style="border: 1px solid #ced4da; border-radius: 6px; padding: 0 15px 15px 15px; margin-bottom: 20px;">
+        <legend style="padding: 0 10px; font-weight: bold; color: #007bff;" id="formTitle">Thêm Bản Quyền Mới</legend>
+        <div class="form-container" style="border: none; padding: 0; margin: 10px 0 0 0; background: none;">
+            <input type="hidden" id="editIndex" value="-1">
+            <div class="form-group">
+                <label for="mouseId">Mã Key (S/N):</label>
+                <input type="text" id="mouseId" placeholder="Ví dụ: GH123-HK224">
+            </div>
+            <div class="form-group">
+                <label for="productName">Tên sản phẩm:</label>
+                <input type="text" id="productName" placeholder="Ví dụ: Windows 11 Pro">
+            </div>
+            <div class="form-group">
+                <label for="userUnit">Đơn vị sử dụng:</label>
+                <input type="text" id="userUnit" placeholder="Ví dụ: Phòng Kế Toán">
+            </div>
+            <div class="form-group">
+                <label for="creatorName">Người nhập dữ liệu:</label>
+                <input type="text" id="creatorName" placeholder="Tên người nhập">
+            </div>
+            <div class="form-group">
+                <label for="licenseType">Loại bản quyền:</label>
+                <select id="licenseType" onchange="xuLyThayDoiLoai()">
+                    <option value="Thời hạn">Có thời hạn (Tùy chỉnh)</option>
+                    <option value="Một năm">Một năm (Tự động)</option>
+                    <option value="Vĩnh viễn">Vĩnh viễn</option>
+                </select>
+            </div>
+            <div class="form-group" id="activationGroup">
+                <label for="activationDate">Ngày kích hoạt:</label>
+                <input type="date" id="activationDate" onchange="tuDongTinhNgayHetHan()">
+            </div>
+            <div class="form-group" id="dateGroup">
+                <label for="expiryDate">Ngày hết hạn:</label>
+                <input type="date" id="expiryDate">
+            </div>
+            <div class="form-group btn-group" style="flex-direction: row; gap: 8px;">
+                <button type="button" class="btn-add" id="btnAdd" onclick="luuDuLieu()">➕ Thêm mới</button>
+                <button type="button" class="btn-update" id="btnUpdate" onclick="luuDuLieu()">💾 Cập nhật</button>
+                <button type="button" class="btn-cancel" id="btnCancel" onclick="huyChinhSua()">Hủy</button>
+            </div>
+        </div>
+    </fieldset>
+
+    <div class="filter-container">
+        <div class="form-group" style="flex: 2;">
+            <label for="searchBox">🔍 Tìm kiếm nhanh:</label>
+            <input type="text" id="searchBox" placeholder="Tìm theo Mã Key, Tên sản phẩm, Đơn vị, Người nhập..." oninput="lamMoiBangHienThi()">
+        </div>
+        <div class="form-group">
+            <label for="filterStatus">📌 Lọc theo trạng thái:</label>
+            <select id="filterStatus" onchange="lamMoiBangHienThi()">
+                <option value="Tất cả">-- Tất cả trạng thái --</option>
+                <option value="Hoạt động">Hoạt động</option>
+                <option value="Vĩnh viễn">Vĩnh viễn</option>
+                <option value="Chờ nhập hạn">Chờ nhập hạn</option>
+                <option value="Hết hạn">Hết hạn</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Mã Key (S/N)</th>
+                    <th>Tên sản phẩm</th>
+                    <th>Đơn vị sử dụng</th>
+                    <th>Người nhập</th>
+                    <th style="width: 110px;">Loại</th>
+                    <th class="text-center" style="width: 120px;">Ngày kích hoạt</th>
+                    <th class="text-center" style="width: 120px;">Ngày hết hạn</th>
+                    <th class="text-center" style="width: 130px;">Trạng thái</th>
+                    <th class="text-center" style="width: 140px;">Hành động</th>
+                </tr>
+            </thead>
+            <tbody id="licenseTableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    var mangDuLieu = [];
+
+    window.onload = function() {
+        datNgayHomNay();
+        try {
+            var savedConfig = localStorage.getItem('heThongBanQuyen_AutoCfg');
+            if (savedConfig === 'true') {
+                document.getElementById('chkAutoDownload').checked = true;
+            }
+        } catch(e) {}
+
+        try {
+            var duLieuGoc = localStorage.getItem('heThongBanQuyen_Data');
+            if (duLieuGoc) {
+                mangDuLieu = JSON.parse(duLieuGoc);
+                if (!Array.isArray(mangDuLieu)) mangDuLieu = [];
+                lamMoiBangHienThi();
+            }
+            capNhatGiaoDienAutoSave();
+        } catch(e) {
+            mangDuLieu = [];
+        }
+    };
+
+    function datNgayHomNay() {
+        var today = new Date();
+        document.getElementById('activationDate').value = dinhDangNgayYMD(today);
+    }
+
+    function dinhDangNgayYMD(date) {
+        var yyyy = date.getFullYear();
+        var mm = date.getMonth() + 1;
+        var dd = date.getDate();
+        return yyyy + '-' + (mm < 10 ? '0' + mm : mm) + '-' + (dd < 10 ? '0' + dd : dd);
+    }
+
+    function tuDongTinhNgayHetHan() {
+        var loai = document.getElementById('licenseType').value;
+        var ngayKichHoatVal = document.getElementById('activationDate').value;
+        if (loai === 'Một năm' && ngayKichHoatVal) {
+            var date = new Date(ngayKichHoatVal);
+            date.setFullYear(date.getFullYear() + 1); 
+            date.setDate(date.getDate() - 1); 
+            document.getElementById('expiryDate').value = dinhDangNgayYMD(date);
+        }
+    }
+
+    function xuLyThayDoiLoai() {
+        var loai = document.getElementById('licenseType').value;
+        var dateGroup = document.getElementById('dateGroup');
+        if (loai === 'Vĩnh viễn') {
+            dateGroup.style.display = 'none';
+            document.getElementById('expiryDate').value = '';
+        } else {
+            dateGroup.style.display = 'flex';
+            if (!document.getElementById('activationDate').value) {
+                datNgayHomNay();
+            }
+            if (loai === 'Một năm') {
+                tuDongTinhNgayHetHan();
+            } else {
+                document.getElementById('expiryDate').value = '';
+            }
+        }
+    }
+
+    function luuVaoBoNhoTrinhDuyet(coThayDoiDuLieu) {
+        try {
+            if (!Array.isArray(mangDuLieu)) mangDuLieu = [];
+            localStorage.setItem('heThongBanQuyen_Data', JSON.stringify(mangDuLieu));
+            if (coThayDoiDuLieu) {
+                var bayGio = new Date();
+                var chuoiGio = (bayGio.getHours() < 10 ? '0' : '') + bayGio.getHours() + ':' + (bayGio.getMinutes() < 10 ? '0' : '') + bayGio.getMinutes() + ':' + (bayGio.getSeconds() < 10 ? '0' : '') + bayGio.getSeconds();
+                var yyyy = bayGio.getFullYear();
+                var mm = bayGio.getMonth() + 1;
+                var dd = bayGio.getDate();
+                var chuoiThoiGian = chuoiGio + " " + (dd < 10 ? '0' + dd : dd) + "/" + (mm < 10 ? '0' + mm : mm) + "/" + yyyy;
+                
+                localStorage.setItem('heThongBanQuyen_AutoBackup', JSON.stringify(mangDuLieu));
+                localStorage.setItem('heThongBanQuyen_LastTime', chuoiThoiGian);
+                capNhatGiaoDienAutoSave();
+
+                if (document.getElementById('chkAutoDownload').checked) {
+                    taiFileSaoLuuVeMay(true);
+                }
+            }
+        } catch(e) {}
+    }
+
+    function luuCauHinhAutoDownload() {
+        try {
+            var checked = document.getElementById('chkAutoDownload').checked;
+            localStorage.setItem('heThongBanQuyen_AutoCfg', checked ? 'true' : 'false');
+        } catch(e) {}
+    }
+
+    function capNhatGiaoDienAutoSave() {
+        try {
+            var thoiGian = localStorage.getItem('heThongBanQuyen_LastTime');
+            var btnRestore = document.getElementById('btnRestoreAuto');
+            var txtSave = document.getElementById('txtLastAutoSave');
+            if (thoiGian) {
+                btnRestore.style.display = 'inline-flex';
+                txtSave.innerText = "✓ Đã tự động lưu lúc: " + thoiGian;
+            } else {
+                btnRestore.style.display = 'none';
+                txtSave.innerText = "";
+            }
+        } catch(e) {}
+    }
+
+    function khoiPhucBanTuDong() {
+        try {
+            var duLieuAuto = localStorage.getItem('heThongBanQuyen_AutoBackup');
+            var thoiGian = localStorage.getItem('heThongBanQuyen_LastTime');
+            if (duLieuAuto) {
+                if (confirm("Bạn có chắc muốn khôi phục lại dữ liệu hệ thống từ bản tự động lưu lúc [" + thoiGian + "] không?")) {
+                    mangDuLieu = JSON.parse(duLieuAuto);
+                    luuVaoBoNhoTrinhDuyet(false);
+                    lamMoiBangHienThi();
+                    alert("Khôi phục thành công!");
+                }
+            } else {
+                alert("Không tìm thấy bản sao lưu tự động nào!");
+            }
+        } catch(e) {
+            alert("Lỗi khôi phục!");
+        }
+    }
+
+    function tinhTrangThai(item) {
+        if (item.type === "Vĩnh viễn") return { text: "Vĩnh viễn", class: "status-permanent" };
+        if (!item.expiry || item.expiry === "-") return { text: "Chờ nhập hạn", class: "status-pending" };
+        var today = new Date();
+        var ngayHomNay = dinhDangNgayYMD(today);
+        if (item.expiry < ngayHomNay) return { text: "Hết hạn", class: "status-expired" };
+        return { text: "Hoạt động", class: "status-active" };
+    }
+
+    function dinhDangNgayHienThi(chuoiNgay) {
+        if (!chuoiNgay || chuoiNgay === "-") return "-";
+        var parts = chuoiNgay.split("-");
+        if (parts.length === 3) return parts[2] + "/" + parts[1] + "/" + parts[0];
+        return chuoiNgay;
+    }
+
+    function escapeHtml(text) {
+        if (!text) return "";
+        return text.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function lamMoiBangHienThi() {
+        var tbody = document.getElementById('licenseTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (!Array.isArray(mangDuLieu)) mangDuLieu = [];
+
+        var tuKhoa = document.getElementById('searchBox').value.toLowerCase().trim();
+        var boLocTrangThai = document.getElementById('filterStatus').value;
+
+        mangDuLieu.forEach(function(item, index) {
+            var doiTuongTrangThai = tinhTrangThai(item);
+            if (boLocTrangThai !== "Tất cả" && doiTuongTrangThai.text !== boLocTrangThai) return;
+
+            if (tuKhoa) {
+                var khopTuKhoa = (item.key && item.key.toLowerCase().includes(tuKhoa)) ||
+                                 (item.product && item.product.toLowerCase().includes(tuKhoa)) ||
+                                 (item.unit && item.unit.toLowerCase().includes(tuKhoa)) ||
+                                 (item.creator && item.creator.toLowerCase().includes(tuKhoa));
+                if (!khopTuKhoa) return;
+            }
+
+            var tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><b>${escapeHtml(item.key)}</b></td>
+                <td>${escapeHtml(item.product)}</td>
+                <td>${escapeHtml(item.unit)}</td>
+                <td>${escapeHtml(item.creator)}</td>
+                <td>${escapeHtml(item.type)}</td>
+                <td class="text-center">${dinhDangNgayHienThi(item.activation)}</td>
+                <td class="text-center">${dinhDangNgayHienThi(item.expiry)}</td>
+                <td class="text-center"><span class="status-badge ${doiTuongTrangThai.class}">${doiTuongTrangThai.text}</span></td>
+                <td class="text-center">
+                    <button type="button" class="btn-edit" onclick="suaDuLieu(${index})">✏️ Sửa</button>
+                    <button type="button" class="btn-delete" onclick="xoaDuLieu(${index})">🗑️ Xóa</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function luuDuLieu() {
+        if (!Array.isArray(mangDuLieu)) mangDuLieu = [];
+        var key = document.getElementById('mouseId').value.trim();
+        var product = document.getElementById('productName').value.trim();
+        var unit = document.getElementById('userUnit').value.trim();
+        var creator = document.getElementById('creatorName').value.trim();
+        var type = document.getElementById('licenseType').value;
+        var activation = document.getElementById('activationDate').value;
+        var expiry = document.getElementById('expiryDate').value;
+
+        if (!key || !product) {
+            alert("Vui lòng điền đầy đủ Mã Key (S/N) và Tên sản phẩm!");
+            return;
+        }
+        if (type !== "Vĩnh viễn" && !expiry) {
+            alert("Vui lòng nhập hoặc chọn Ngày hết hạn!");
+            return;
+        }
+
+        var item = {
+            key: key,
+            product: product,
+            unit: unit || "-",
+            creator: creator || "-",
+            type: type,
+            activation: activation || "-",
+            expiry: type === "Vĩnh viễn" ? "-" : expiry
+        };
+
+        var editIndex = parseInt(document.getElementById('editIndex').value);
+        if (editIndex === -1) {
+            mangDuLieu.push(item);
+        } else {
+            mangDuLieu[editIndex] = item;
+        }
+
+        luuVaoBoNhoTrinhDuyet(true); 
+        lamMoiBangHienThi();
+        huyChinhSua();
+    }
+
+    function suaDuLieu(index) {
+        var item = mangDuLieu[index];
+        if (!item) return;
+
+        document.getElementById('editIndex').value = index;
+        document.getElementById('mouseId').value = item.key;
+        document.getElementById('productName').value = item.product;
+        document.getElementById('userUnit').value = item.unit === "-" ? "" : item.unit;
+        document.getElementById('creatorName').value = item.creator === "-" ? "" : item.creator;
+        document.getElementById('licenseType').value = item.type;
+        
+        xuLyThayDoiLoai();
+        if (item.activation !== "-") document.getElementById('activationDate').value = item.activation;
+        if (item.type !== "Vĩnh viễn" && item.expiry !== "-") document.getElementById('expiryDate').value = item.expiry;
+
+        document.getElementById('formTitle').innerText = "Cập Nhật Bản Quyền";
+        document.getElementById('btnAdd').style.display = "none";
+        document.getElementById('btnUpdate').style.display = "inline-flex";
+        document.getElementById('btnCancel').style.display = "inline-flex";
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function huyChinhSua() {
+        document.getElementById('editIndex').value = "-1";
+        document.getElementById('mouseId').value = "";
+        document.getElementById('productName').value = "";
+        document.getElementById('userUnit').value = "";
+        document.getElementById('creatorName').value = "";
+        document.getElementById('licenseType').value = "Thời hạn";
+        datNgayHomNay();
+        xuLyThayDoiLoai();
+        document.getElementById('formTitle').innerText = "Thêm Bản Quyền Mới";
+        document.getElementById('btnAdd').style.display = "inline-flex";
+        document.getElementById('btnUpdate').style.display = "none";
+        document.getElementById('btnCancel').style.display = "none";
+    }
+
+    function xoaDuLieu(index) {
+        if (!Array.isArray(mangDuLieu)) mangDuLieu = [];
+        if (confirm("Bạn có chắc chắn muốn xóa thông tin bản quyền này không?")) {
+            mangDuLieu.splice(index, 1);
+            try {
+                localStorage.setItem('heThongBanQuyen_Data', JSON.stringify(mangDuLieu));
+                var bayGio = new Date();
+                var chuoiGio = (bayGio.getHours() < 10 ? '0' : '') + bayGio.getHours() + ':' + (bayGio.getMinutes() < 10 ? '0' : '') + bayGio.getMinutes() + ':' + (bayGio.getSeconds() < 10 ? '0' : '') + bayGio.getSeconds();
+                var yyyy = bayGio.getFullYear();
+                var mm = bayGio.getMonth() + 1;
+                var dd = bayGio.getDate();
+                var chuoiThoiGian = chuoiGio + " " + (dd < 10 ? '0' + dd : dd) + "/" + (mm < 10 ? '0' + mm : mm) + "/" + yyyy;
+                
+                localStorage.setItem('heThongBanQuyen_AutoBackup', JSON.stringify(mangDuLieu));
+                localStorage.setItem('heThongBanQuyen_LastTime', chuoiThoiGian);
+                capNhatGiaoDienAutoSave();
+            } catch(e) {}
+
+            lamMoiBangHienThi();
+            var editIndex = parseInt(document.getElementById('editIndex').value);
+            if (editIndex === index) {
+                huyChinhSua();
+            } else if (editIndex > index) {
+                document.getElementById('editIndex').value = editIndex - 1;
+            }
+        }
+    }
+
+    function taiFileSaoLuuVeMay(isAutoTriggered) {
+        if (!Array.isArray(mangDuLieu) || mangDuLieu.length === 0) {
+            if (!isAutoTriggered) alert("Không có dữ liệu hiện tại để xuất file sao lưu!");
+            return;
+        }
+        var chuoiDuLieu = JSON.stringify(mangDuLieu, null, 2);
+        var blob = new Blob([chuoiDuLieu], { type: "text/plain;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var prefix = isAutoTriggered ? "AutoBackup_" : "Backup_";
+        var tenFile = prefix + "BanQuyen_" + dinhDangNgayYMD(new Date()) + ".txt";
+        
+        var link = document.createElement("a");
+        link.href = url;
+        link.download = tenFile;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    function docFileDuLieu(input) {
+        var file = input.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                var duLieuNap = JSON.parse(e.target.result);
+                if (Array.isArray(duLieuNap)) {
+                    if (confirm("Bạn có muốn GHI ĐÈ toàn bộ danh sách bằng dữ liệu file này không?\n- OK: Ghi đè\n- Cancel: Trộn thêm vào danh sách cũ.")) {
+                        mangDuLieu = duLieuNap;
+                    } else {
+                        if (!Array.isArray(mangDuLieu)) mangDuLieu = [];
+                        mangDuLieu = mangDuLieu.concat(duLieuNap);
+                    }
+                    luuVaoBoNhoTrinhDuyet(true); 
+                    lamMoiBangHienThi();
+                    alert("Nhập dữ liệu từ file thành công!");
+                } else {
+                    alert("File không đúng định dạng!");
+                }
+            } catch (err) {
+                alert("Lỗi đọc file!");
+            }
+            input.value = "";
+        };
+        reader.readAsText(file);
+    }
+</script>
+
+</body>
+</html>
